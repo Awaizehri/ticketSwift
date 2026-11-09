@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block title %}Upcoming Comedy Shows — TicketSwift{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-8">
+        <h1 class="fw-bold text-warning mb-1">🎭 Live Theater & Comedy Shows</h1>
+        <p class="text-secondary mb-0">Select an upcoming performance and reserve your seats with real-time locking.</p>
+    </div>
+</div>
+
+<div class="row g-4">
+    {% for show in shows %}
+        <div class="col-lg-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body d-flex flex-column">
+                    <div class="d-flex justify-content-between align-items-start mb-2">
+                        <h3 class="card-title text-light fw-bold mb-0">{{ show.name }}</h3>
+                        <span class="badge bg-warning text-dark fw-bold">📍 {{ show.venue }}</span>
+                    </div>
+                    
+                    <p class="card-text text-secondary mt-2 mb-4 flex-grow-1">
+                        {{ show.description|default:"Get ready for an unforgettable night of comedy and live entertainment!" }}
+                    </p>
+
+                    <h6 class="text-warning border-bottom border-secondary pb-2 mb-3">Available Showtimes:</h6>
+                    <div class="d-flex flex-column gap-2">
+                        {% for st in show.showtimes.all %}
+                            <div class="p-3 rounded bg-dark border border-secondary d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="fw-bold text-light">📅 {{ st.date_time|date:"l, F d, Y" }}</div>
+                                    <small class="text-secondary">⏰ {{ st.date_time|date:"h:i A" }} &bull; <span class="text-success fw-bold">${{ st.price }}</span> per seat</small>
+                                </div>
+                                <a href="{% url 'shows:seat_selection' st.showtime_id %}" class="btn btn-warning btn-sm fw-bold">
+                                    Select Seats &rarr;
+                                </a>
+                            </div>
+                        {% empty %}
+                            <p class="text-secondary small mb-0">No upcoming showtimes announced for this event.</p>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% empty %}
+        <div class="col-12">
+            <div class="card p-5 text-center">
+                <h4 class="text-secondary">No shows currently listed</h4>
+                <p class="text-secondary">Check back soon or run the seed command to populate demo shows.</p>
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}

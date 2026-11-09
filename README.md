@@ -11,7 +11,7 @@
 ## Project Milestones & Roadmap
 
 - [x] **Module 1: Setup & Domain Architecture** — Environment split, custom User roles, data schema, migrations, admin registration, and seed data command.
-- [ ] **Module 2: Booking Flow & Concurrency Controls**  Seat reservation view, `transaction.atomic` & `select_for_update` locking mechanisms, customer portal, and concurrent booking race condition tests.
+- [x] **Module 2: Booking Flow & Concurrency Controls**  Seat reservation view, `transaction.atomic` & `select_for_update` locking mechanisms, customer portal, and concurrent booking race condition tests.
 - [ ] **Module 3: Scannable Tickets, Check-In & Manager Analytics**  Unique ticket hash generation, dynamic QR passes, door scanner validation API, and manager sales summary dashboard.
 - [ ] **Module 4: Quality Assurance, Containerization & Live Deployment**  Comprehensive test coverage, Docker Compose containerization, and free-tier cloud deployment (Render + Neon PostgreSQL).
 

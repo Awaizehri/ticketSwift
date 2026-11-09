@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Login — TicketSwift{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card shadow-lg p-4 mt-3">
+            <h3 class="fw-bold mb-3 text-warning">Patron & Staff Login</h3>
+            <p class="text-secondary small mb-4">Sign in to manage reservations, check ticket passes, or review box office sales.</p>
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger py-2">
+                    {% for error in form.non_field_errors %}
+                        <small>{{ error }}</small>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post" novalidate>
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="id_username" class="form-label text-light">Username</label>
+                    <input type="text" name="username" class="form-control bg-dark text-light border-secondary" id="id_username" required autofocus>
+                </div>
+                <div class="mb-3">
+                    <label for="id_password" class="form-label text-light">Password</label>
+                    <input type="password" name="password" class="form-control bg-dark text-light border-secondary" id="id_password" required>
+                </div>
+                {% if request.GET.next %}
+                    <input type="hidden" name="next" value="{{ request.GET.next }}">
+                {% endif %}
+                <button type="submit" class="btn btn-warning w-100 fw-bold mt-2">Log In</button>
+            </form>
+
+            <div class="text-center mt-3 small text-secondary">
+                Need an account? <a href="{% url 'accounts:signup' %}" class="text-warning text-decoration-none">Sign up here</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

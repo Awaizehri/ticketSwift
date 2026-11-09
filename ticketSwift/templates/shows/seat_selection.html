@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}Select Seats — {{ showtime.show.name }}{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+    <div class="col-12">
+        <a href="{% url 'shows:show_list' %}" class="text-secondary text-decoration-none small">&larr; Back to all shows</a>
+        <h2 class="fw-bold text-warning mt-2 mb-1">🎭 {{ showtime.show.name }}</h2>
+        <p class="text-secondary mb-0">
+            📍 {{ showtime.show.venue }} &bull; 
+            📅 {{ showtime.date_time|date:"l, F d, Y @ h:i A" }} &bull; 
+            <span class="badge bg-success">${{ showtime.price }} / seat</span>
+        </p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Seat Map Column -->
+    <div class="col-lg-8">
+        <div class="card p-4 shadow">
+            <div class="stage-banner mb-4">
+                🎤 STAGE / PERFORMANCE AREA
+            </div>
+
+            <form id="booking-form" method="post" action="{% url 'bookings:book_seats' showtime.showtime_id %}">
+                {% csrf_token %}
+                
+                <div class="text-center mb-4">
+                    <div class="d-flex justify-content-center flex-wrap gap-2" style="max-width: 500px; margin: 0 auto;">
+                        {% for seat in seats %}
+                            {% if seat.is_booked %}
+                                <button type="button" class="btn seat-btn seat-booked" disabled title="Seat {{ seat.seat_number }} (Booked)">
+                                    {{ seat.seat_number }}
+                                </button>
+                            {% else %}
+                                <input type="checkbox" class="btn-check seat-checkbox" name="seat_ids" value="{{ seat.seat_id }}" id="seat-{{ seat.seat_id }}" autocomplete="off" data-label="{{ seat.seat_number }}">
+                                <label class="btn seat-btn seat-available" for="seat-{{ seat.seat_id }}" title="Seat {{ seat.seat_number }} (Available)">
+                                    {{ seat.seat_number }}
+                                </label>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Legend -->
+                <div class="d-flex justify-content-center gap-4 border-top border-secondary pt-3 small text-secondary">
+                    <div><span class="badge bg-success me-1">&nbsp;</span> Available</div>
+                    <div><span class="badge bg-warning text-dark me-1">&nbsp;</span> Selected</div>
+                    <div><span class="badge bg-secondary me-1">&nbsp;</span> Booked</div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Booking Summary Sidebar -->
+    <div class="col-lg-4">
+        <div class="card p-4 shadow sticky-top" style="top: 20px;">
+            <h4 class="fw-bold text-warning mb-3">Reservation Summary</h4>
+            
+            <div class="mb-3">
+                <div class="d-flex justify-content-between text-secondary mb-1">
+                    <span>Available Capacity:</span>
+                    <span class="text-light fw-bold">{{ available_seats }} / {{ total_seats }}</span>
+                </div>
+                <div class="d-flex justify-content-between text-secondary mb-1">
+                    <span>Price per Ticket:</span>
+                    <span class="text-light fw-bold">${{ showtime.price }}</span>
+                </div>
+            </div>
+
+            <hr class="border-secondary">
+
+            <div class="mb-3">
+                <label class="form-label text-secondary small mb-1">Selected Seats:</label>
+                <div id="selected-seats-list" class="fw-bold text-warning font-monospace">None selected</div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <span class="fs-5 text-secondary">Total:</span>
+                <span class="fs-3 fw-bold text-success" id="total-price-display">$0.00</span>
+            </div>
+
+            {% if user.is_authenticated %}
+                <button type="submit" form="booking-form" id="confirm-booking-btn" class="btn btn-warning w-100 fw-bold py-2" disabled>
+                    Confirm & Reserve Tickets
+                </button>
+            {% else %}
+                <a href="{% url 'accounts:login' %}?next={{ request.path }}" class="btn btn-warning w-100 fw-bold py-2">
+                    Log In to Reserve Seats
+                </a>
+                <small class="text-secondary text-center d-block mt-2">New patron? <a href="{% url 'accounts:signup' %}?next={{ request.path }}" class="text-warning">Create account</a></small>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const pricePerSeat = parseFloat("{{ showtime.price }}");
+    const checkboxes = document.querySelectorAll('.seat-checkbox');
+    const selectedList = document.getElementById('selected-seats-list');
+    const totalPriceDisplay = document.getElementById('total-price-display');
+    const confirmBtn = document.getElementById('confirm-booking-btn');
+
+    function updateSummary() {
+        const checked = Array.from(checkboxes).filter(cb => cb.checked);
+        const selectedLabels = checked.map(cb => cb.getAttribute('data-label'));
+
+        if (selectedLabels.length > 0) {
+            selectedList.textContent = selectedLabels.join(', ');
+            const total = (checked.length * pricePerSeat).toFixed(2);
+            totalPriceDisplay.textContent = `$${total}`;
+            if (confirmBtn) confirmBtn.disabled = false;
+        } else {
+            selectedList.textContent = 'None selected';
+            totalPriceDisplay.textContent = '$0.00';
+            if (confirmBtn) confirmBtn.disabled = true;
+        }
+    }
+
+    checkboxes.forEach(cb => {
+        cb.addEventListener('change', function() {
+            const label = document.querySelector(`label[for="${this.id}"]`);
+            if (this.checked) {
+                label.classList.remove('seat-available');
+                label.classList.add('btn-warning', 'text-dark');
+            } else {
+                label.classList.remove('btn-warning', 'text-dark');
+                label.classList.add('seat-available');
+            }
+            updateSummary();
+        });
+    });
+</script>
+{% endblock %}
