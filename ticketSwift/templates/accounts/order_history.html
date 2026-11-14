@@ -6,7 +6,7 @@
 <div class="row">
     <div class="col-12 mb-4">
         <h2 class="fw-bold text-warning">🎟️ Your Order History</h2>
-        <p class="text-secondary">Track all your reservations and digital admission passes.</p>
+        <p class="text-secondary">Present these digital QR entry passes to the door attendant upon arrival.</p>
     </div>
 
     {% if orders %}
@@ -35,21 +35,31 @@
                             </div>
                         </div>
 
-                        <h6 class="text-warning mt-3 border-bottom border-secondary pb-2">Issued Ticket Passes:</h6>
+                        <h6 class="text-warning mt-3 border-bottom border-secondary pb-2">Digital QR Admission Passes:</h6>
                         <div class="row g-3">
-                            {% for ticket in order.ticket_set.all %}
-                                <div class="col-sm-6 col-md-4">
-                                    <div class="p-3 rounded bg-dark border border-secondary d-flex justify-content-between align-items-center">
-                                        <div>
-                                            <div class="fw-bold text-light">Seat {{ ticket.seat.seat_number }}</div>
-                                            <small class="text-secondary font-monospace">{{ ticket.unique_code }}</small>
-                                        </div>
-                                        <div>
-                                            {% if ticket.is_used %}
-                                                <span class="badge bg-danger">Used</span>
-                                            {% else %}
-                                                <span class="badge bg-success">Valid</span>
-                                            {% endif %}
+                            {% for ticket in order.tickets.all|default:order.ticket_set.all %}
+                                <div class="col-md-6 col-lg-4">
+                                    <div class="p-3 rounded bg-dark border border-secondary d-flex gap-3 align-items-center">
+                                        {% if ticket.qr_image %}
+                                            <a href="{{ ticket.qr_image.url }}" target="_blank" title="Click to view full-size QR pass">
+                                                <img src="{{ ticket.qr_image.url }}" alt="QR Code" class="rounded bg-white p-1" style="width: 72px; height: 72px; object-fit: contain;">
+                                            </a>
+                                        {% else %}
+                                            <div class="bg-secondary rounded d-flex align-items-center justify-content-center text-dark fw-bold" style="width: 72px; height: 72px;">
+                                                QR
+                                            </div>
+                                        {% endif %}
+                                        <div class="flex-grow-1 overflow-hidden">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="fs-5 fw-bold text-light">Seat {{ ticket.seat.seat_number }}</span>
+                                                {% if ticket.is_used %}
+                                                    <span class="badge bg-danger">Used</span>
+                                                {% else %}
+                                                    <span class="badge bg-success">Valid</span>
+                                                {% endif %}
+                                            </div>
+                                            <code class="text-warning small text-truncate d-block">{{ ticket.unique_code }}</code>
+                                            <small class="text-secondary">Scan at venue door</small>
                                         </div>
                                     </div>
                                 </div>

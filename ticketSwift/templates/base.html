@@ -90,6 +90,14 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'accounts:order_history' %}">My Orders</a>
                         </li>
+                        {% if user.is_staff or user.role == 'manager' %}
+                            <li class="nav-item">
+                                <a class="nav-link text-warning fw-bold" href="{% url 'bookings:door_checkin' %}">🎟️ Door Scanner</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link text-info fw-bold" href="{% url 'bookings:manager_dashboard' %}">📊 Dashboard</a>
+                            </li>
+                        {% endif %}
                         <li class="nav-item ms-lg-2">
                             <span class="badge bg-secondary me-2">{{ user.username }} ({{ user.role }})</span>
                         </li>

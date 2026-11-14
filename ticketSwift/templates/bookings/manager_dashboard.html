@@ -1,0 +1,157 @@
+{% extends 'base.html' %}
+
+{% block title %}Manager Sales Summary Dashboard — TicketSwift{% endblock %}
+
+{% block content %}
+<div class="row align-items-center mb-4">
+    <div class="col-md-7">
+        <h2 class="fw-bold text-warning mb-1">📊 Box Office Sales Dashboard</h2>
+        <p class="text-secondary mb-0">Live box office revenue, occupancy rates, and showtime attendance performance.</p>
+    </div>
+    <div class="col-md-5 text-md-end mt-3 mt-md-0">
+        <a href="{% url 'bookings:door_checkin' %}" class="btn btn-warning fw-bold me-2">
+            🎟️ Door Scanner Screen
+        </a>
+        <a href="/admin/shows/show/add/" class="btn btn-outline-secondary" target="_blank">
+            + New Show (Admin)
+        </a>
+    </div>
+</div>
+
+<!-- ── KPI METRICS CARDS ────────────────────────────────────────────────── -->
+<div class="row g-3 mb-4">
+    <!-- Total Revenue -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card p-3 shadow-sm border-secondary h-100">
+            <span class="text-secondary small fw-bold">TOTAL GROSS REVENUE</span>
+            <div class="fs-2 fw-bold text-success mt-2">${{ total_revenue|floatformat:2 }}</div>
+            <small class="text-secondary mt-auto pt-1">Across all confirmed orders</small>
+        </div>
+    </div>
+
+    <!-- Tickets Sold -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card p-3 shadow-sm border-secondary h-100">
+            <span class="text-secondary small fw-bold">TICKETS RESERVED</span>
+            <div class="fs-2 fw-bold text-warning mt-2">{{ total_tickets_sold }}</div>
+            <small class="text-secondary mt-auto pt-1">Total physical passes issued</small>
+        </div>
+    </div>
+
+    <!-- Door Check-Ins -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card p-3 shadow-sm border-secondary h-100">
+            <span class="text-secondary small fw-bold">DOOR CHECK-INS</span>
+            <div class="fs-2 fw-bold text-info mt-2">{{ total_checkins }}</div>
+            <small class="text-secondary mt-auto pt-1">Scanned at venue door</small>
+        </div>
+    </div>
+
+    <!-- Overall Occupancy -->
+    <div class="col-sm-6 col-lg-3">
+        <div class="card p-3 shadow-sm border-secondary h-100">
+            <span class="text-secondary small fw-bold">OVERALL OCCUPANCY</span>
+            <div class="fs-2 fw-bold text-light mt-2">{{ overall_occupancy }}%</div>
+            <div class="progress mt-2" style="height: 6px;">
+                <div class="progress-bar bg-warning" role="progressbar" style="width: {{ overall_occupancy }}%;"></div>
+            </div>
+            <small class="text-secondary mt-auto pt-1">{{ total_tickets_sold }} of {{ total_seats_capacity }} seats</small>
+        </div>
+    </div>
+</div>
+
+<!-- ── SEARCH & FILTER CONTROLS ─────────────────────────────────────────── -->
+<div class="card p-3 mb-4 shadow-sm border-secondary">
+    <form method="get" class="row g-2 align-items-center">
+        <div class="col-md-5">
+            <div class="input-group">
+                <span class="input-group-text bg-dark border-secondary text-secondary">🔍</span>
+                <input type="text" name="q" value="{{ query }}" class="form-control bg-dark text-light border-secondary" placeholder="Search by show title or venue...">
+            </div>
+        </div>
+
+        <div class="col-md-5">
+            <div class="btn-group w-100" role="group">
+                <a href="?status=all{% if query %}&q={{ query }}{% endif %}" class="btn btn-sm {% if status_filter == 'all' %}btn-warning fw-bold text-dark{% else %}btn-outline-secondary text-light{% endif %}">
+                    All Performances
+                </a>
+                <a href="?status=upcoming{% if query %}&q={{ query }}{% endif %}" class="btn btn-sm {% if status_filter == 'upcoming' %}btn-warning fw-bold text-dark{% else %}btn-outline-secondary text-light{% endif %}">
+                    Upcoming Only
+                </a>
+                <a href="?status=past{% if query %}&q={{ query }}{% endif %}" class="btn btn-sm {% if status_filter == 'past' %}btn-warning fw-bold text-dark{% else %}btn-outline-secondary text-light{% endif %}">
+                    Past Shows
+                </a>
+            </div>
+            <input type="hidden" name="status" value="{{ status_filter }}">
+        </div>
+
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-warning btn-sm fw-bold flex-grow-1">Filter</button>
+            {% if query or status_filter != 'all' %}
+                <a href="{% url 'bookings:manager_dashboard' %}" class="btn btn-outline-secondary btn-sm" title="Clear all filters">Reset</a>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<!-- ── DETAILED SHOW SALES BREAKDOWN TABLE ──────────────────────────────── -->
+<div class="card shadow border-secondary">
+    <div class="card-header bg-dark border-secondary py-3">
+        <h5 class="fw-bold text-light mb-0">Event Sales Breakdown</h5>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-dark table-hover align-middle mb-0">
+            <thead class="text-secondary small">
+                <tr>
+                    <th scope="col" class="ps-4">SHOW & VENUE</th>
+                    <th scope="col" class="text-center">SHOWTIMES</th>
+                    <th scope="col" class="text-center">SEATS SOLD / CAP</th>
+                    <th scope="col">OCCUPANCY RATE</th>
+                    <th scope="col" class="text-end pe-4">GROSS SALES</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in show_metrics %}
+                    <tr>
+                        <td class="ps-4">
+                            <div class="fw-bold text-light">{{ item.show.name }}</div>
+                            <small class="text-secondary">📍 {{ item.show.venue }}</small>
+                        </td>
+                        <td class="text-center">
+                            <span class="badge bg-secondary">{{ item.showtimes_count }} performance(s)</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="fw-bold {% if item.sold == item.capacity and item.capacity > 0 %}text-success{% else %}text-light{% endif %}">
+                                {{ item.sold }}
+                            </span>
+                            <span class="text-secondary">/ {{ item.capacity }}</span>
+                        </td>
+                        <td style="min-width: 160px;">
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="progress flex-grow-1" style="height: 8px;">
+                                    <div class="progress-bar {% if item.occupancy >= 80 %}bg-success{% elif item.occupancy >= 40 %}bg-warning{% else %}bg-secondary{% endif %}" role="progressbar" style="width: {{ item.occupancy }}%;"></div>
+                                </div>
+                                <small class="text-secondary font-monospace">{{ item.occupancy }}%</small>
+                            </div>
+                        </td>
+                        <td class="text-end pe-4">
+                            <span class="fw-bold text-success fs-6">${{ item.revenue|floatformat:2 }}</span>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5">
+                            <div class="text-secondary fs-1 mb-2">📋</div>
+                            <h5 class="text-secondary">No show sales records found</h5>
+                            <p class="text-secondary small mb-3">Try adjusting your search criteria or filter status.</p>
+                            {% if query or status_filter != 'all' %}
+                                <a href="{% url 'bookings:manager_dashboard' %}" class="btn btn-warning btn-sm fw-bold">Reset Filters</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

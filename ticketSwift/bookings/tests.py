@@ -1,5 +1,6 @@
+import json
 import threading
-from django.test import TransactionTestCase, Client
+from django.test import TransactionTestCase, TestCase, Client
 from django.urls import reverse
 from django.utils import timezone
 from django.db import connection
@@ -42,8 +43,6 @@ class BookingConcurrencyTestCase(TransactionTestCase):
         )
 
     def test_simultaneous_booking_prevents_double_sale(self):
-        # 1. Pre-authenticate both patrons on the main thread
-        # This creates their sessions cleanly before the concurrent race starts
         client_alice = Client()
         client_alice.force_login(self.alice)
 
@@ -56,13 +55,9 @@ class BookingConcurrencyTestCase(TransactionTestCase):
         url = reverse('bookings:book_seats', kwargs={'showtime_id': self.showtime.showtime_id})
 
         def book_seat_worker(client, username):
-            # Ensure each OS thread operates on its own dedicated DB connection
             connection.close()
             try:
-                # Wait until both threads reach the starting gate
                 barrier.wait(timeout=5)
-
-                # Fire concurrent requests at the exact same instant
                 response = client.post(
                     url,
                     {'seat_ids': [str(self.seat.seat_id)]},
@@ -83,33 +78,27 @@ class BookingConcurrencyTestCase(TransactionTestCase):
         thread_alice.join()
         thread_bob.join()
 
-        # ── VERIFY THE CONCURRENCY SAFEGUARDS ───────────────────────────────
         self.assertEqual(len(errors), 0, f"Thread errors encountered: {errors}")
         self.assertEqual(len(results), 2, "Expected 2 responses from concurrent threads.")
 
-        # In SQLite or Postgres, exactly ONE Order must be created
         total_orders = Order.objects.count()
         self.assertEqual(
             total_orders, 1,
             f"Double Booking Failure! Expected 1 Order, found {total_orders}."
         )
 
-        # Exactly ONE Ticket must be issued
         total_tickets = Ticket.objects.count()
         self.assertEqual(
             total_tickets, 1,
             f"Double Ticket Sale! Expected 1 Ticket, found {total_tickets}."
         )
 
-        # The seat must be locked as booked
         self.seat.refresh_from_db()
         self.assertTrue(self.seat.is_booked, "Seat was not saved as booked.")
 
-        # Exactly one user succeeds
         winning_order = Order.objects.first()
         self.assertIn(winning_order.customer.username, ["alice", "bob"])
 
-        # The other user received the conflict notice or was safely redirected
         losing_user = "bob" if winning_order.customer.username == "alice" else "alice"
         losing_response = next(resp for user, code, resp in results if user == losing_user)
 
@@ -123,3 +112,98 @@ class BookingConcurrencyTestCase(TransactionTestCase):
             has_conflict_notice or losing_response.status_code in [200, 302],
             f"Losing patron {losing_user} was not properly notified."
         )
+
+
+class TicketValidationAndDashboardTestCase(TestCase):
+    """
+    Test suite for Module 3: QR generation, Door Check-in validation API,
+    counterfeit & reuse protection, and Manager sales dashboard.
+    """
+
+    def setUp(self):
+        self.manager = User.objects.create_user(
+            username="manager_test",
+            password="managerpass123",
+            role=User.MANAGER
+        )
+        self.customer = User.objects.create_user(
+            username="customer_test",
+            password="customerpass123",
+            role=User.CUSTOMER
+        )
+        self.show = Show.objects.create(name="Chicago Improv Festival", venue="Second City Stage")
+        self.showtime = Showtime.objects.create(
+            show=self.show,
+            date_time=timezone.now() + timezone.timedelta(days=2),
+            price=30.00
+        )
+        self.seat = Seat.objects.create(showtime=self.showtime, seat_number="C-1", is_booked=True)
+        self.order = Order.objects.create(showtime=self.showtime, customer=self.customer, total_amount=30.00)
+        self.ticket = Ticket.objects.create(order=self.order, seat=self.seat, unique_code="TS-TESTPASS01")
+        self.ticket.generate_qr_code(save=True)
+
+    def test_qr_code_generated(self):
+        """Verifies high-contrast PNG QR image is generated on disk."""
+        self.assertTrue(bool(self.ticket.qr_image))
+        self.assertTrue(self.ticket.qr_image.name.startswith("qr_codes/"))
+
+    def test_validate_ticket_api_success(self):
+        """Verifies valid ticket is granted admission and marked as used."""
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            reverse('bookings:validate_ticket_api'),
+            data=json.dumps({'ticket_code': 'TS-TESTPASS01'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'valid')
+        self.ticket.refresh_from_db()
+        self.assertTrue(self.ticket.is_used)
+        self.assertIsNotNone(self.ticket.used_at)
+
+    def test_validate_ticket_api_already_used_rejected(self):
+        """Verifies previously scanned tickets are rejected with 409 Conflict."""
+        self.ticket.is_used = True
+        self.ticket.used_at = timezone.now()
+        self.ticket.save()
+
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            reverse('bookings:validate_ticket_api'),
+            data=json.dumps({'ticket_code': 'TS-TESTPASS01'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 409)
+        data = response.json()
+        self.assertEqual(data['status'], 'already_used')
+
+    def test_validate_ticket_api_counterfeit_rejected(self):
+        """Verifies bogus/forged codes return 404 Not Found."""
+        self.client.force_login(self.manager)
+        response = self.client.post(
+            reverse('bookings:validate_ticket_api'),
+            data=json.dumps({'ticket_code': 'TS-NONEXISTENT'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertEqual(data['status'], 'invalid')
+
+    def test_validate_ticket_api_unauthorized_for_patron(self):
+        """Verifies non-staff patrons are blocked from calling the validation route."""
+        self.client.force_login(self.customer)
+        response = self.client.post(
+            reverse('bookings:validate_ticket_api'),
+            data=json.dumps({'ticket_code': 'TS-TESTPASS01'}),
+            content_type='application/json'
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_manager_dashboard_view(self):
+        """Verifies manager sales dashboard loads KPIs and show performance tables."""
+        self.client.force_login(self.manager)
+        response = self.client.get(reverse('bookings:manager_dashboard'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Box Office Sales Dashboard")
+        self.assertContains(response, "Chicago Improv Festival")
