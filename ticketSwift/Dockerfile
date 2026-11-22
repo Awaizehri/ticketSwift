@@ -1,0 +1,30 @@
+# 1. Base image
+FROM python:3.13-slim
+
+# 2. Environment flags for Python in containers
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# 3. Work directory inside container
+WORKDIR /app
+
+# 4. Install system dependencies if needed (e.g. libpq for postgres)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 5. Copy requirements first for layer caching
+COPY requirements.txt .
+
+# 6. Install Python dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# 7. Copy project codebase
+COPY . .
+
+# 8. Expose port 8000
+EXPOSE 8000
+
+# 9. Launch via Gunicorn using production settings
+CMD ["gunicorn", "ticketSwift.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
