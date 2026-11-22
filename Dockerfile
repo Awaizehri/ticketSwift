@@ -15,6 +15,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Run collectstatic during build
+ENV DJANGO_SETTINGS_MODULE=ticketSwift.settings.production
+ENV SECRET_KEY=build-phase-secret-key-temporary
+RUN python manage.py collectstatic --noinput
+
 EXPOSE 8000
 
-CMD ["gunicorn", "ticketSwift.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+# On startup: migrate, seed demo data, and bind to Render's $PORT (or 8000)
+CMD ["sh", "-c", "python manage.py migrate && python manage.py seed_data && gunicorn ticketSwift.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 3"]
