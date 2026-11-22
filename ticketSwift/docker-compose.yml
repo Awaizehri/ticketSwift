@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: ticketswift_db
+    environment:
+      POSTGRES_DB: ticketswift
+      POSTGRES_USER: ticketswift_user
+      POSTGRES_PASSWORD: ticketswift_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  web:
+    build: .
+    container_name: ticketswift_web
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=True
+      - SECRET_KEY=django-insecure-dev-key-change-in-prod
+      - DJANGO_SETTINGS_MODULE=ticketSwift.settings.local
+      - DATABASE_URL=postgres://ticketswift_user:ticketswift_password@db:5432/ticketswift
+    depends_on:
+      - db
+
+volumes:
+  postgres_data:
